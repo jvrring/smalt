@@ -2,18 +2,18 @@ import aiohttp
 from loguru import logger
 
 from models import InstanceInfo
-from ..exceptions import (
+from exceptions import (
     SmaltError,
     InternalServerError,
     NotFoundError,
     InvalidURLError
 )
-from ..constants import (
+from constants import (
     NOT_FOUND, 
     INTERNAL_SERVER_ERROR
 )
 
-class Client:
+class SmaltClient:
     """Client for interacting with the cobalt API."""
     def __init__(self, base_url: str) -> None:
         """Initialize the wrapper with the API url.
@@ -24,7 +24,17 @@ class Client:
             The API url of the cobalt instance.
         """
         self.base_url = base_url
+        self.session = None
+
+    async def __aenter__(self):
         self.session = aiohttp.ClientSession()
+        return self
+
+    async def __aexit__(
+        self, exc_type: type, exc: Exception, tb
+    ) -> None:
+        if self.session:
+            await self.session.close()
         
     def validate_base_url(self, base_url: str) -> None:
         """Ensure that the base url is valid."""
@@ -33,15 +43,18 @@ class Client:
 
     async def close(self) -> None:
         """Close the HTTP session."""
-        await self.session.close()
+        if self.session:
+            await self.session.close()
 
     async def get_instance_info(self) -> InstanceInfo:
         """Get information about the cobalt instance."""
+        if self.session is None:
+            self.session = aiohttp.ClientSession()
+
         try:
             async with self.session.get(f"{self.base_url}") as r:
                 r.raise_for_status()
                 data = await r.json()
-
                 return InstanceInfo(**data)
         except aiohttp.ClientResponseError as e:
             if e.status == NOT_FOUND:
