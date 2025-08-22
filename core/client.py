@@ -1,3 +1,4 @@
+from types import TracebackType
 import aiohttp
 from loguru import logger
 
@@ -31,7 +32,7 @@ class SmaltClient:
         return self
 
     async def __aexit__(
-        self, exc_type: type, exc: Exception, tb
+        self, exc_type: type, exc: Exception, tb: TracebackType | None
     ) -> None:
         if self.session:
             await self.session.close()
@@ -50,6 +51,8 @@ class SmaltClient:
         """Get information about the cobalt instance."""
         if self.session is None:
             self.session = aiohttp.ClientSession()
+
+        self.validate_base_url(self.base_url)
 
         try:
             async with self.session.get(f"{self.base_url}") as r:
